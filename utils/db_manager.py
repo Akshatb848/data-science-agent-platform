@@ -1,41 +1,49 @@
-import streamlit as st
-from sqlalchemy import create_engine, text
-from sqlalchemy.pool import NullPool
-import datetime
+import os
+import pandas as pd
+import sqlalchemy as sa
+from sqlalchemy import text
+from sqlalchemy.engine import Engine
+
+_ENGINE: Engine | None = None
 
 
-def get_engine():
-    db_url = st.secrets["DATABASE_URL"]
+def get_engine() -> Engine:
+    global _ENGINE
 
-    return create_engine(
+    if _ENGINE is not None:
+        return _ENGINE
+
+    db_url = os.getenv("DATABASE_URL")
+    if not db_url:
+        raise RuntimeError("DATABASE_URL environment variable not set")
+
+    # Neon requires psycopg (v3)
+    _ENGINE = sa.create_engine(
         db_url,
-        poolclass=NullPool,      # 🔥 REQUIRED FOR NEON
         pool_pre_ping=True,
         future=True,
     )
+    return _ENGINE
 
 
-def ensure_project_exists(project_id: str, description: str = "Auto-created project"):
+def ensure_project_exists(project_id: str, description: str = ""):
     engine = get_engine()
-
     with engine.begin() as conn:
         conn.execute(text("""
             CREATE TABLE IF NOT EXISTS project_metadata (
-                project_id VARCHAR PRIMARY KEY,
+                project_id TEXT PRIMARY KEY,
                 description TEXT,
-                created_at TIMESTAMP
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
         """))
-
-        conn.execute(text("""
-            INSERT INTO project_metadata (project_id, description, created_at)
-            VALUES (:pid, :desc, :ts)
-            ON CONFLICT (project_id) DO NOTHING
-        """), {
-            "pid": project_id,
-            "desc": description,
-            "ts": datetime.datetime.utcnow()
-        })
+        conn.execute(
+            text("""
+                INSERT INTO project_metadata (project_id, description)
+                VALUES (:pid, :desc)
+                ON CONFLICT (project_id) DO NOTHING
+            """),
+            {"pid": project_id, "desc": description},
+        )
 
 
 def log_agent_start(project_id: str, agent_name: str):
@@ -44,50 +52,56 @@ def log_agent_start(project_id: str, agent_name: str):
 
     with engine.begin() as conn:
         conn.execute(text("""
-            INSERT INTO agent_status (project_id, agent_name, status, started_at)
-            VALUES (:pid, :agent, 'running', :ts)
-        """), {
-            "pid": project_id,
-            "agent": agent_name,
-            "ts": datetime.datetime.utcnow()
-        })
+            CREATE TABLE IF NOT EXISTS agent_status (
+                id SERIAL PRIMARY KEY,
+                project_id TEXT,
+                agent_name TEXT,
+                status TEXT,
+                started_at TIMESTAMP,
+                completed_at TIMESTAMP,
+                error_message TEXT
+            )
+        """))
+
+        conn.execute(
+            text("""
+                INSERT INTO agent_status (project_id, agent_name, status, started_at)
+                VALUES (:pid, :agent, 'running', CURRENT_TIMESTAMP)
+            """),
+            {"pid": project_id, "agent": agent_name},
+        )
 
 
-def log_agent_success(project_id: str, agent_name: str, output_location: str | None):
+def log_agent_success(project_id: str, agent_name: str):
     engine = get_engine()
-
     with engine.begin() as conn:
-        conn.execute(text("""
-            UPDATE agent_status
-            SET status = 'completed',
-                completed_at = :ts,
-                output_location = :out
-            WHERE project_id = :pid
-              AND agent_name = :agent
-              AND status = 'running'
-        """), {
-            "pid": project_id,
-            "agent": agent_name,
-            "ts": datetime.datetime.utcnow(),
-            "out": output_location
-        })
+        conn.execute(
+            text("""
+                UPDATE agent_status
+                SET status='completed', completed_at=CURRENT_TIMESTAMP
+                WHERE project_id=:pid AND agent_name=:agent AND status='running'
+            """),
+            {"pid": project_id, "agent": agent_name},
+        )
 
 
-def log_agent_failure(project_id: str, agent_name: str, error_message: str):
+def log_agent_failure(project_id: str, agent_name: str, error: str):
     engine = get_engine()
-
     with engine.begin() as conn:
-        conn.execute(text("""
-            UPDATE agent_status
-            SET status = 'failed',
-                completed_at = :ts,
-                error_message = :err
-            WHERE project_id = :pid
-              AND agent_name = :agent
-              AND status = 'running'
-        """), {
-            "pid": project_id,
-            "agent": agent_name,
-            "ts": datetime.datetime.utcnow(),
-            "err": error_message
-        })
+        conn.execute(
+            text("""
+                UPDATE agent_status
+                SET status='failed', completed_at=CURRENT_TIMESTAMP, error_message=:err
+                WHERE project_id=:pid AND agent_name=:agent AND status='running'
+            """),
+            {"pid": project_id, "agent": agent_name, "err": error},
+        )
+
+
+def load_table(table: str, project_id: str) -> pd.DataFrame:
+    engine = get_engine()
+    return pd.read_sql(
+        text(f"SELECT * FROM {table} WHERE project_id=:pid"),
+        engine,
+        params={"pid": project_id},
+    )
