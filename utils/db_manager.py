@@ -7,26 +7,18 @@ from sqlalchemy.pool import NullPool
 
 
 def get_engine():
-    try:
-        conn = st.secrets["connections"]["postgresql"]
-        url = (
-            f"postgresql://{conn['username']}:{conn['password']}"
-            f"@{conn['host']}:{conn['port']}/{conn['database']}"
+    db_url = os.getenv("DATABASE_URL")
+
+    if not db_url:
+        raise RuntimeError(
+            "DATABASE_URL is not set. Configure it in Streamlit Secrets."
         )
-    except Exception:
-        from os import environ
-        url = environ.get("DATABASE_URL")
 
     return create_engine(
-        url,
-        poolclass=NullPool,          # CRITICAL FOR NEON
-        pool_pre_ping=True,          # validates connection before use
-        connect_args={
-            "sslmode": "require"     # Neon requires SSL
-        },
+        db_url,
+        pool_pre_ping=True,
+        future=True,
     )
-
-    return engine
 
 
 def init_db():
