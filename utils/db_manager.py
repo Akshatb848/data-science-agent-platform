@@ -8,21 +8,42 @@ _ENGINE: Engine | None = None
 
 
 def get_engine() -> Engine:
+    """
+    Creates a singleton SQLAlchemy engine for Neon (Postgres).
+    Requires DATABASE_URL to be set with sslmode=require.
+    """
     global _ENGINE
 
     if _ENGINE is not None:
         return _ENGINE
 
     db_url = os.getenv("DATABASE_URL")
-    if not db_url:
-        raise RuntimeError("DATABASE_URL environment variable not set")
 
-    # Neon requires psycopg (v3)
-    _ENGINE = sa.create_engine(
+    if not db_url:
+        raise RuntimeError(
+            "DATABASE_URL is not set. "
+            "Add it in Streamlit Secrets or environment variables."
+        )
+
+    # Enforce psycopg3 + SSL (required by Neon)
+    if not db_url.startswith("postgresql+psycopg://"):
+        db_url = db_url.replace(
+            "postgresql://",
+            "postgresql+psycopg://",
+        )
+
+    if "sslmode=" not in db_url:
+        sep = "&" if "?" in db_url else "?"
+        db_url = f"{db_url}{sep}sslmode=require"
+
+    _ENGINE = create_engine(
         db_url,
         pool_pre_ping=True,
+        pool_size=5,
+        max_overflow=5,
         future=True,
     )
+
     return _ENGINE
 
 
