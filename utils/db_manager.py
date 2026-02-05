@@ -8,13 +8,16 @@ from sqlalchemy.pool import NullPool
 
 
 def get_engine():
-    db_url = os.getenv("DATABASE_URL")
+    try:
+        db_url = st.secrets["DATABASE_URL"]
+    except KeyError:
+        raise RuntimeError("DATABASE_URL not found in Streamlit secrets")
 
     return create_engine(
         db_url,
         pool_pre_ping=True,
-        future=True,
-        connect_args={"sslmode": "require"},
+        pool_size=5,
+        max_overflow=10,
     )
 
 
