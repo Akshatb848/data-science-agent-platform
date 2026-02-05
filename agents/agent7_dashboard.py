@@ -1,27 +1,42 @@
-import streamlit as st
-from streamlit_option_menu import option_menu
-from st_aggrid import AgGrid
-import plotly.express as px
-from utils.db_manager import load_df
+import pandas as pd
+from utils.db_manager import get_engine
+
 
 class DashboardAgent:
     def __init__(self, project_id: str):
         self.project_id = project_id
+        self.engine = get_engine()
 
-    def run(self) -> dict:
-        # Load all data
-        project = load_df(self.project_id, "project_metadata")
-        agents = load_df(self.project_id, "agent_status")
-        features = load_df(self.project_id, "feature_store")
-        models = load_df(self.project_id, "model_results")
+    def run(self):
+        data = {}
 
-        # Interactive components (better than PowerBI: code-dynamic, real-time)
-        data = {
-            "project": project,
-            "agents": agents,
-            "features": features,
-            "models": models
-        }
-        return data  # app.py renders
+        data["project"] = pd.read_sql(
+            "SELECT * FROM project_metadata WHERE project_id = %(pid)s",
+            self.engine,
+            params={"pid": self.project_id},
+        )
 
-    # Note: Rendering happens in app.py for interactivity
+        data["agents"] = pd.read_sql(
+            """
+            SELECT *
+            FROM agent_status
+            WHERE project_id = %(pid)s
+            ORDER BY started_at
+            """,
+            self.engine,
+            params={"pid": self.project_id},
+        )
+
+        data["features"] = pd.read_sql(
+            "SELECT * FROM feature_store WHERE project_id = %(pid)s",
+            self.engine,
+            params={"pid": self.project_id},
+        )
+
+        data["models"] = pd.read_sql(
+            "SELECT * FROM model_results WHERE project_id = %(pid)s",
+            self.engine,
+            params={"pid": self.project_id},
+        )
+
+        return data
