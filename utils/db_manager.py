@@ -2,6 +2,7 @@ import sqlalchemy as sa
 from sqlalchemy import create_engine
 import pandas as pd
 import streamlit as st
+from sqlalchemy.dialects.postgresql import JSONB
 
 from sqlalchemy.pool import NullPool
 
