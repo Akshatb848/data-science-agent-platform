@@ -1,27 +1,27 @@
 import streamlit as st
+import pandas as pd
+
 from agents.coordinator import CoordinatorAgent
 from agents.agent7_dashboard import DashboardAgent
 
-st.set_page_config(page_title="Data Science Agent Platform", layout="wide")
+st.set_page_config(page_title="Multi-Agent Data Science Platform", layout="wide")
+
 st.title("Multi-Agent Data Science Platform")
 
 project_id = st.text_input("Project ID", value="test_project")
 
-if st.button("Run Pipeline"):
-    CoordinatorAgent(project_id).run_pipeline()
-    st.success("Pipeline completed")
+uploaded_file = st.file_uploader("Upload CSV", type=["csv"])
 
-if st.button("Load Dashboard"):
-    data = DashboardAgent(project_id).run()
+if uploaded_file:
+    df = pd.read_csv(uploaded_file)
+    st.success("CSV uploaded successfully")
+    st.dataframe(df.head())
 
-    st.subheader("Project")
-    st.dataframe(data["project"])
+    if st.button("Run Pipeline"):
+        coord = CoordinatorAgent(project_id)
+        coord.run_pipeline(df)
 
-    st.subheader("Agents")
-    st.dataframe(data["agents"])
+        st.success("Pipeline executed successfully")
 
-    st.subheader("Features")
-    st.dataframe(data["features"])
-
-    st.subheader("Models")
-    st.dataframe(data["models"])
+        dashboard = DashboardAgent(project_id)
+        dashboard.render()
