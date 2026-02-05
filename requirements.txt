@@ -31,3 +31,9 @@ ollama==0.0.1
 
 streamlit-aggrid==0.3.4.post3
 streamlit-option-menu==0.3.6
+
+langchain-groq==0.2.0
+langchain-community==0.3.1
+torch==2.4.1  # For DL in AutoGluon
+gymnasium==0.29.1  # For RL envs if needed (basic)
+streamlit-extras==0.4.0  # For advanced BI components
