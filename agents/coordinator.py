@@ -8,13 +8,14 @@ class CoordinatorAgent:
     def __init__(self, project_id: str):
         self.project_id = project_id
 
-    def run_agent(self, name, fn):
-        log_agent_start(self.project_id, name)
+    def run_agent(self, agent_name, fn):
+        log_agent_start(self.project_id, agent_name)
+        output = agent_callable()
         try:
             fn()
-            log_agent_success(self.project_id, name)
+            log_agent_success(self.project_id, agent_name)
         except Exception as e:
-            log_agent_failure(self.project_id, name, str(e))
+            log_agent_failure(self.project_id, agent_name, str(e))
             raise
 
     def run_pipeline(self):
