@@ -1,8 +1,10 @@
 import streamlit as st
+import pandas as pd
+
 from agents.coordinator import CoordinatorAgent
 from agents.agent7_dashboard import DashboardAgent
 from streamlit_option_menu import option_menu
-import plotly.io as pio
+
 
 
 st.set_page_config(page_title="Expert Data Science Agent", layout="wide")
