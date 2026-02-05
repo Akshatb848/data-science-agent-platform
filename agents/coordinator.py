@@ -19,28 +19,28 @@ class CoordinatorAgent:
             raise
 
     def run_pipeline(self):
-    print(f"[Coordinator] Running pipeline for project: {self.project_id}")
+        print(f"[Coordinator] Running pipeline for project: {self.project_id}")
 
-    from agents.agent3_warehouse import WarehouseAgent
-    self.run_agent("warehouse", WarehouseAgent(self.project_id).run)
+        from agents.agent3_warehouse import WarehouseAgent
+        self.run_agent("warehouse", WarehouseAgent(self.project_id).run)
 
-    from agents.agent1_cleaner import DataCleanerAgent
-    self.run_agent(
-        "data_cleaner",
-        DataCleanerAgent(self.project_id).clean,
-        self.dataset,  # IMPORTANT: dataset must be passed
-    )
+        from agents.agent1_cleaner import DataCleanerAgent
+        self.run_agent(
+            "data_cleaner",
+            DataCleanerAgent(self.project_id).clean,
+            self.dataset,  # IMPORTANT: dataset must be passed
+        )
 
-    from agents.agent4_features import FeatureEngineeringAgent
-    self.run_agent("feature_engineering", FeatureEngineeringAgent(self.project_id).run)
+        from agents.agent4_features import FeatureEngineeringAgent
+        self.run_agent("feature_engineering", FeatureEngineeringAgent(self.project_id).run)
 
-    from agents.agent2_visualizer import VisualizerAgent
-    self.run_agent("visualizer", VisualizerAgent(self.project_id).run)
+        from agents.agent2_visualizer import VisualizerAgent
+        self.run_agent("visualizer", VisualizerAgent(self.project_id).run)
 
-    from agents.agent5_automl import AutoMLAgent
-    self.run_agent("automl_recommendation", AutoMLAgent(self.project_id).run)
+        from agents.agent5_automl import AutoMLAgent
+        self.run_agent("automl_recommendation", AutoMLAgent(self.project_id).run)
 
-    from agents.agent6_model_training import ModelTrainingAgent
-    self.run_agent("model_training", ModelTrainingAgent(self.project_id).run)
+        from agents.agent6_model_training import ModelTrainingAgent
+        self.run_agent("model_training", ModelTrainingAgent(self.project_id).run)
 
-    print("[Coordinator] Pipeline completed")
+        print("[Coordinator] Pipeline completed")
