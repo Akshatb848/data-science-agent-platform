@@ -8,8 +8,8 @@ def get_llm():
         api_key=st.secrets["groq"]["api_key"]
     )
 
-def query_llm(prompt: str, system: str = "You are an expert data scientist AI.") -> str:
-    llm = get_llm()
-    messages = [{"role": "system", "content": system}, {"role": "user", "content": prompt}]
-    response = llm.invoke(messages)
-    return response.content
+#def query_llm(prompt: str, system: str = "You are an expert data scientist AI.") -> str:
+    #llm = get_llm()
+    #messages = [{"role": "system", "content": system}, {"role": "user", "content": prompt}]
+    #response = llm.invoke(messages)
+    #return response.content
