@@ -177,6 +177,100 @@ class TestWorkflowPlanning:
         assert "ModelTrainerAgent" not in agent_names
 
 
+class TestConversationalReply:
+    @pytest.mark.asyncio
+    async def test_greeting_reply(self, coordinator):
+        reply = await coordinator.generate_conversational_reply(
+            "Hello!", context={"has_dataset": False}
+        )
+        assert "hello" in reply.lower() or "ai data scientist" in reply.lower()
+
+    @pytest.mark.asyncio
+    async def test_thanks_reply(self, coordinator):
+        reply = await coordinator.generate_conversational_reply(
+            "Thanks a lot!", context={}
+        )
+        assert "welcome" in reply.lower()
+
+    @pytest.mark.asyncio
+    async def test_capabilities_redirects_to_help(self, coordinator):
+        reply = await coordinator.generate_conversational_reply(
+            "What can you do?", context={}
+        )
+        assert "Available Commands" in reply
+
+    @pytest.mark.asyncio
+    async def test_no_dataset_suggests_upload(self, coordinator):
+        reply = await coordinator.generate_conversational_reply(
+            "I need some analysis", context={"has_dataset": False}
+        )
+        assert "upload" in reply.lower()
+
+    @pytest.mark.asyncio
+    async def test_dataset_loaded_suggests_actions(self, coordinator):
+        reply = await coordinator.generate_conversational_reply(
+            "What should I do next?",
+            context={
+                "has_dataset": True,
+                "has_target": True,
+                "dataset_summary": "100 rows x 5 columns",
+                "completed_analyses": {},
+            },
+        )
+        assert "Analyze" in reply or "Clean" in reply
+
+    @pytest.mark.asyncio
+    async def test_with_completed_analyses_suggests_next(self, coordinator):
+        reply = await coordinator.generate_conversational_reply(
+            "What now?",
+            context={
+                "has_dataset": True,
+                "has_target": True,
+                "dataset_summary": "100 rows x 5 columns",
+                "completed_analyses": {"cleaning": {}, "eda": {}},
+            },
+        )
+        assert "cleaning" in reply.lower() or "eda" in reply.lower()
+        assert "next" in reply.lower() or "suggest" in reply.lower() or "feature" in reply.lower()
+
+    @pytest.mark.asyncio
+    async def test_all_done_congratulates(self, coordinator):
+        all_done = {
+            "cleaning": {}, "eda": {}, "feature_engineering": {},
+            "modeling": {}, "automl": {}, "visualization": {}, "dashboard": {},
+        }
+        reply = await coordinator.generate_conversational_reply(
+            "What now?",
+            context={
+                "has_dataset": True,
+                "has_target": True,
+                "dataset_summary": "100 rows x 5 columns",
+                "completed_analyses": all_done,
+            },
+        )
+        assert "completed" in reply.lower() or "thorough" in reply.lower()
+
+    @pytest.mark.asyncio
+    async def test_ds_question_reply(self, coordinator):
+        reply = await coordinator.generate_conversational_reply(
+            "What is overfitting?", context={"has_dataset": False}
+        )
+        assert "data science" in reply.lower() or "upload" in reply.lower()
+
+    @pytest.mark.asyncio
+    async def test_no_target_suggests_setting_one(self, coordinator):
+        reply = await coordinator.generate_conversational_reply(
+            "What next?",
+            context={
+                "has_dataset": True,
+                "has_target": False,
+                "dataset_summary": "100 rows x 5 columns",
+                "completed_analyses": {},
+            },
+        )
+        assert "target" in reply.lower()
+
+
 class TestUIHelpers:
     def test_welcome_message(self, coordinator):
         msg = coordinator.get_welcome_message()

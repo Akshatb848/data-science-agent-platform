@@ -349,14 +349,22 @@ async def handle_user_message(user_input: str):
     elif intent == "run_pipeline":
         response = await _run_full_pipeline(user_input)
     elif intent == "run_agent":
-        response = await _run_single_agent(intent_result, user_input)
-    else:
-        # General conversation / data science Q&A
-        explanation = intent_result.get("explanation", "")
-        if explanation:
-            response = explanation
+        # Guardrail: check if agent needs a target column
+        agent_name = intent_result.get("agent", "")
+        if agent_name in ("ModelTrainerAgent", "AutoMLAgent") and not st.session_state.target_column:
+            response = (
+                f"To use **{agent_name}**, you need a target column. "
+                "Please select one from the sidebar dropdown, then try again."
+            )
         else:
-            response = "I'm not sure what you'd like me to do. Try asking me to analyze your data, train models, or run a full pipeline!"
+            response = await _run_single_agent(intent_result, user_input)
+    else:
+        # General conversation / data science Q&A — GPT-like interactive reply
+        enriched_context = {
+            **context,
+            "completed_analyses": st.session_state.analysis_results,
+        }
+        response = await coordinator.generate_conversational_reply(user_input, enriched_context)
 
     coordinator.add_to_memory("assistant", response if isinstance(response, str) else response[0])
     return response

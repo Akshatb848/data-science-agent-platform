@@ -2,7 +2,7 @@
 Prompt Templates for LLM-powered Coordinator Agent
 """
 
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Sequence
 
 
 class PromptTemplates:
@@ -122,6 +122,41 @@ Respond with a JSON object:
 Only include steps that are relevant to the user's goal and dataset.
 If no target column is set, skip ModelTrainerAgent and AutoMLAgent.
 Respond ONLY with the JSON object."""
+
+    @staticmethod
+    def conversational_reply(
+        user_message: str,
+        context: Dict[str, Any],
+        analysis_history: Sequence[Dict[str, Any]],
+    ) -> str:
+        has_dataset = context.get("has_dataset", False)
+        has_target = context.get("has_target", False)
+        dataset_summary = context.get("dataset_summary", "")
+        completed = list(context.get("completed_analyses", {}).keys()) if context.get("completed_analyses") else []
+
+        history_summary = ""
+        if analysis_history:
+            history_parts = [f"- {h['agent']}: {h['action']}" for h in list(analysis_history)[-5:]]
+            history_summary = "\nRecent analyses:\n" + "\n".join(history_parts)
+
+        return f"""The user sent a general message (not a direct agent command). Respond naturally and helpfully as an expert AI data scientist.
+
+User message: "{user_message}"
+
+Current state:
+- Dataset loaded: {has_dataset}
+- Target column set: {has_target}
+- Dataset info: {dataset_summary if has_dataset else 'No dataset loaded'}
+- Completed analyses: {', '.join(completed) if completed else 'None yet'}{history_summary}
+
+Guidelines:
+- If the user asks a data science question, answer it concisely with expertise
+- If the user is greeting you or making small talk, be friendly but steer toward helping with their data
+- Based on the current state, proactively suggest relevant next steps
+- If no dataset is loaded, encourage them to upload one
+- Be conversational and engaging, like a friendly expert data scientist colleague
+- Use markdown formatting for readability
+- Keep your response focused and under 200 words"""
 
     @staticmethod
     def dataset_summary(info: Dict[str, Any]) -> str:

@@ -33,6 +33,23 @@ class TestPromptTemplates:
         prompt = PromptTemplates.plan_workflow("100 x 5", None, "explore data")
         assert "Not specified" in prompt
 
+    def test_conversational_reply_includes_message(self):
+        prompt = PromptTemplates.conversational_reply(
+            "Hello there!",
+            context={"has_dataset": True, "has_target": True, "dataset_summary": "100 x 5"},
+            analysis_history=[{"agent": "EDAAgent", "action": "full_eda"}],
+        )
+        assert "Hello there!" in prompt
+        assert "Dataset loaded: True" in prompt
+        assert "EDAAgent" in prompt
+
+    def test_conversational_reply_no_history(self):
+        prompt = PromptTemplates.conversational_reply(
+            "Hi", context={"has_dataset": False}, analysis_history=[]
+        )
+        assert "Hi" in prompt
+        assert "No dataset loaded" in prompt
+
     def test_dataset_summary(self):
         info = {
             "shape": {"rows": 150, "columns": 5},
