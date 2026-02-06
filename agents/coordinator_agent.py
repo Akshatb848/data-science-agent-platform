@@ -300,6 +300,20 @@ class CoordinatorAgent(BaseAgent):
             lines.append(f"- **CV Mean**: {best_metrics.get('cv_mean', 0):.4f} (+/- {best_metrics.get('cv_std', 0):.4f})")
             n_models = len(result_data.get("results", {}))
             lines.append(f"- Trained {n_models} models total")
+            n_feats = result_data.get("n_features")
+            if n_feats:
+                lines.append(f"- Used {n_feats} features on {result_data.get('n_samples', '?')} samples")
+            if result_data.get("target_encoded"):
+                lines.append("- Target column was auto-encoded (categorical → numeric)")
+            id_dropped = result_data.get("id_columns_dropped", [])
+            text_dropped = result_data.get("text_columns_dropped", [])
+            cat_encoded = result_data.get("categorical_features_encoded", [])
+            if id_dropped:
+                lines.append(f"- Dropped ID columns: {', '.join(id_dropped)}")
+            if text_dropped:
+                lines.append(f"- Dropped text columns: {', '.join(text_dropped)}")
+            if cat_encoded:
+                lines.append(f"- Auto-encoded {len(cat_encoded)} categorical features")
 
         elif agent_name == "DataCleanerAgent":
             report = result_data.get("cleaning_report", result_data)
@@ -308,14 +322,27 @@ class CoordinatorAgent(BaseAgent):
             if orig and final:
                 lines.append(f"- **Before**: {orig[0] if isinstance(orig, (list, tuple)) else orig} rows")
                 lines.append(f"- **After**: {final[0] if isinstance(final, (list, tuple)) else final} rows")
+            orig_missing = report.get("original_missing_total", 0)
+            if orig_missing:
+                lines.append(f"- **Original missing values**: {orig_missing}")
             for step in report.get("steps", []):
                 step_name = step.get("step", "")
                 if step_name == "remove_duplicates":
                     lines.append(f"- Duplicates removed: {step.get('removed', 0)}")
                 elif step_name == "handle_missing":
-                    lines.append(f"- Missing values filled: {step.get('values_filled', 0)}")
+                    filled = step.get('values_filled', 0)
+                    lines.append(f"- Missing values filled: {filled}")
+                    details = step.get("details", [])
+                    for d in details[:5]:
+                        lines.append(f"  - `{d['column']}`: {d['filled']} values ({d['strategy']})")
+                    if len(details) > 5:
+                        lines.append(f"  - ... and {len(details) - 5} more columns")
                 elif step_name == "handle_outliers":
-                    lines.append(f"- Outliers clipped: {step.get('clipped', 0)}")
+                    clipped = step.get('clipped', 0)
+                    lines.append(f"- Outliers clipped: {clipped}")
+                    details = step.get("details", [])
+                    for d in details[:5]:
+                        lines.append(f"  - `{d['column']}`: {d['clipped']} outliers")
                 else:
                     lines.append(f"- {step_name}: {step.get('removed', 0)} items")
 
