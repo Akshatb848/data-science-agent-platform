@@ -367,7 +367,9 @@ async def _run_single_agent(intent_result: dict, user_context: str):
     agent_name = intent_result.get("agent", "")
     action = intent_result.get("action", "")
     coordinator: CoordinatorAgent = st.session_state.coordinator
-    df = st.session_state.get("current_df") or st.session_state.get("df")
+    df = st.session_state.get("current_df")
+    if df is None:
+        df = st.session_state.get("df")
 
     if df is None:
         return "Please upload a dataset first (use the sidebar)."
