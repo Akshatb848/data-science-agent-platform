@@ -65,9 +65,9 @@ def _prepare_features(df: pd.DataFrame, target_column: str) -> tuple:
     feature_df = df.drop(columns=[target_column])
 
     # Convert pandas 3.x StringDtype to object for numpy compatibility
-    str_dtype_cols = feature_df.select_dtypes(include=['string']).columns
-    if len(str_dtype_cols) > 0:
-        feature_df[str_dtype_cols] = feature_df[str_dtype_cols].astype(object)
+    for col in feature_df.columns:
+        if pd.api.types.is_string_dtype(feature_df[col]) and feature_df[col].dtype != "object":
+            feature_df[col] = feature_df[col].astype(object)
 
     # Drop ID-like columns
     id_cols = [c for c in feature_df.columns if _is_id_column(feature_df, c)]
@@ -147,9 +147,9 @@ class ModelTrainerAgent(BaseAgent):
 
         df = df.copy()
         # Convert pandas 3.x StringDtype to object for numpy compatibility
-        str_dtype_cols = df.select_dtypes(include=['string']).columns
-        if len(str_dtype_cols) > 0:
-            df[str_dtype_cols] = df[str_dtype_cols].astype(object)
+        for col in df.columns:
+            if pd.api.types.is_string_dtype(df[col]) and df[col].dtype != "object":
+                df[col] = df[col].astype(object)
 
         cv_folds = task.get("cv_folds", 5)
 

@@ -235,8 +235,22 @@ def _load_uploaded_file(uploaded):
         st.sidebar.error(f"Error loading file: {e}")
 
 
+def _sanitize_dtypes(df: pd.DataFrame) -> pd.DataFrame:
+    """Convert pandas 3.x StringDtype columns to plain object for numpy compatibility.
+
+    pandas 3.0 with future.infer_string=True makes all string columns use
+    StringDtype, which breaks numpy operations (corr, get_dummies, factorize).
+    This must be called once when data is first loaded.
+    """
+    for col in df.columns:
+        if pd.api.types.is_string_dtype(df[col]) and df[col].dtype != "object":
+            df[col] = df[col].astype(object)
+    return df
+
+
 def _set_dataframe(df: pd.DataFrame, name: str):
     """Store a dataframe in session state and add a system message."""
+    df = _sanitize_dtypes(df)
     st.session_state.df = df
     st.session_state.current_df = df.copy()
     st.session_state.analysis_results = {}

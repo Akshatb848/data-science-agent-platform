@@ -53,12 +53,12 @@ class EDAAgent(BaseAgent):
 
         df = df.copy()
         # Convert pandas 3.x StringDtype to object for numpy compatibility
-        str_dtype_cols = df.select_dtypes(include=['string']).columns
-        if len(str_dtype_cols) > 0:
-            df[str_dtype_cols] = df[str_dtype_cols].astype(object)
+        for col in df.columns:
+            if pd.api.types.is_string_dtype(df[col]) and df[col].dtype != "object":
+                df[col] = df[col].astype(object)
 
         target_column = task.get("target_column")
-        
+
         self.eda_report = {
             "timestamp": datetime.now().isoformat(),
             "dataset_info": self._get_dataset_info(df),
@@ -189,9 +189,9 @@ class EDAAgent(BaseAgent):
         if df is None:
             return TaskResult(success=False, error="No dataframe provided")
         df = df.copy()
-        str_dtype_cols = df.select_dtypes(include=['string']).columns
-        if len(str_dtype_cols) > 0:
-            df[str_dtype_cols] = df[str_dtype_cols].astype(object)
+        for col in df.columns:
+            if pd.api.types.is_string_dtype(df[col]) and df[col].dtype != "object":
+                df[col] = df[col].astype(object)
         return TaskResult(success=True, data=self._compute_statistical_profile(df))
 
     async def _correlation_analysis(self, task: Dict[str, Any]) -> TaskResult:
@@ -199,7 +199,7 @@ class EDAAgent(BaseAgent):
         if df is None:
             return TaskResult(success=False, error="No dataframe provided")
         df = df.copy()
-        str_dtype_cols = df.select_dtypes(include=['string']).columns
-        if len(str_dtype_cols) > 0:
-            df[str_dtype_cols] = df[str_dtype_cols].astype(object)
+        for col in df.columns:
+            if pd.api.types.is_string_dtype(df[col]) and df[col].dtype != "object":
+                df[col] = df[col].astype(object)
         return TaskResult(success=True, data=self._compute_correlations(df))
