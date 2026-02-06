@@ -59,9 +59,9 @@ class DashboardBuilderAgent(BaseAgent):
         # Convert pandas 3.x StringDtype to object for numpy compatibility
         if df is not None:
             df = df.copy()
-            str_dtype_cols = df.select_dtypes(include=['string']).columns
-            if len(str_dtype_cols) > 0:
-                df[str_dtype_cols] = df[str_dtype_cols].astype(object)
+            for col in df.columns:
+                if pd.api.types.is_string_dtype(df[col]) and df[col].dtype != "object":
+                    df[col] = df[col].astype(object)
 
         sections: List[Dict[str, Any]] = []
 

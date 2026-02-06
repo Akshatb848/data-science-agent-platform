@@ -46,9 +46,9 @@ class DataVisualizerAgent(BaseAgent):
 
         df = df.copy()
         # Convert pandas 3.x StringDtype to object for numpy compatibility
-        str_dtype_cols = df.select_dtypes(include=['string']).columns
-        if len(str_dtype_cols) > 0:
-            df[str_dtype_cols] = df[str_dtype_cols].astype(object)
+        for col in df.columns:
+            if pd.api.types.is_string_dtype(df[col]) and df[col].dtype != "object":
+                df[col] = df[col].astype(object)
 
         chart_types = task.get("chart_types", ["distribution", "correlation", "scatter", "boxplot"])
         self.charts = []
@@ -130,9 +130,9 @@ class DataVisualizerAgent(BaseAgent):
             return TaskResult(success=False, error="Missing dataframe or column")
 
         df = df.copy()
-        str_dtype_cols = df.select_dtypes(include=['string']).columns
-        if len(str_dtype_cols) > 0:
-            df[str_dtype_cols] = df[str_dtype_cols].astype(object)
+        for col in df.columns:
+            if pd.api.types.is_string_dtype(df[col]) and df[col].dtype != "object":
+                df[col] = df[col].astype(object)
         
         if chart_type == "histogram":
             data = {"values": df[column].dropna().tolist()[:1000]}

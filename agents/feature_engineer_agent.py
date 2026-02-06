@@ -108,9 +108,9 @@ class FeatureEngineerAgent(BaseAgent):
 
         df = df.copy()
         # Convert pandas 3.x StringDtype to object for numpy compatibility
-        str_dtype_cols = df.select_dtypes(include=['string']).columns
-        if len(str_dtype_cols) > 0:
-            df[str_dtype_cols] = df[str_dtype_cols].astype(object)
+        for col in df.columns:
+            if pd.api.types.is_string_dtype(df[col]) and df[col].dtype != "object":
+                df[col] = df[col].astype(object)
 
         target = task.get("target_column")
         original_cols = list(df.columns)
@@ -225,9 +225,9 @@ class FeatureEngineerAgent(BaseAgent):
             return TaskResult(success=False, error="No dataframe provided")
 
         df = df.copy()
-        str_dtype_cols = df.select_dtypes(include=['string']).columns
-        if len(str_dtype_cols) > 0:
-            df[str_dtype_cols] = df[str_dtype_cols].astype(object)
+        for col in df.columns:
+            if pd.api.types.is_string_dtype(df[col]) and df[col].dtype != "object":
+                df[col] = df[col].astype(object)
 
         target = task.get("target_column")
         for col in [c for c in df.select_dtypes(include=['object', 'category', 'str']).columns if c != target]:
