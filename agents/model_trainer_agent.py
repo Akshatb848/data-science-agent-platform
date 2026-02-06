@@ -1,8 +1,9 @@
 """
 Model Trainer Agent - Robust model training and evaluation
 
-Handles arbitrary datasets by:
-- Encoding categorical target columns automatically
+Works on ANY dataset by:
+- Encoding categorical target columns automatically (LabelEncoder)
+- Auto-encoding categorical features internally (label encode + one-hot)
 - Dropping ID-like and text columns
 - Handling NaN in target/features
 - Graceful fallback when no models can be trained
@@ -34,6 +35,69 @@ def _is_id_column(df: pd.DataFrame, col: str) -> bool:
         if df[col].nunique() >= len(df) * 0.9:
             return True
     return False
+
+
+def _is_text_column(df: pd.DataFrame, col: str) -> bool:
+    """Detect free-text columns that shouldn't be used as features."""
+    if not (df[col].dtype == "object" or pd.api.types.is_string_dtype(df[col])):
+        return False
+    sample = df[col].dropna()
+    if len(sample) == 0:
+        return False
+    avg_len = sample.astype(str).str.len().mean()
+    if avg_len > 50:
+        return True
+    if sample.nunique() > 20 and sample.nunique() / len(sample) > 0.8:
+        return True
+    col_lower = col.lower()
+    if any(kw in col_lower for kw in ["email", "name", "description", "text", "comment",
+                                       "address", "url", "subject", "body", "note"]):
+        if sample.nunique() > 20:
+            return True
+    return False
+
+
+def _prepare_features(df: pd.DataFrame, target_column: str) -> tuple:
+    """Prepare features by encoding categoricals and dropping unusable columns.
+
+    Returns (X, id_cols_dropped, encoded_cols) where X is a fully numeric DataFrame.
+    """
+    feature_df = df.drop(columns=[target_column])
+
+    # Drop ID-like columns
+    id_cols = [c for c in feature_df.columns if _is_id_column(feature_df, c)]
+    if id_cols:
+        feature_df = feature_df.drop(columns=id_cols)
+
+    # Drop text columns
+    text_cols = [c for c in feature_df.columns if _is_text_column(feature_df, c)]
+    if text_cols:
+        feature_df = feature_df.drop(columns=text_cols)
+
+    # Encode remaining categorical columns
+    encoded_cols = []
+    cat_cols = [c for c in feature_df.select_dtypes(include=['object', 'category', 'str']).columns]
+    for col in cat_cols:
+        n_unique = feature_df[col].nunique()
+        if n_unique <= 2:
+            feature_df[col] = pd.factorize(feature_df[col])[0]
+        elif n_unique <= 10:
+            dummies = pd.get_dummies(feature_df[col], prefix=col, drop_first=True)
+            # Ensure boolean dummies are int
+            for d in dummies.columns:
+                dummies[d] = dummies[d].astype(int)
+            feature_df = pd.concat([feature_df.drop(columns=[col]), dummies], axis=1)
+        else:
+            # Frequency encoding for high-cardinality categoricals
+            freq_map = feature_df[col].value_counts(normalize=True).to_dict()
+            feature_df[f'{col}_freq'] = feature_df[col].map(freq_map).fillna(0)
+            feature_df = feature_df.drop(columns=[col])
+        encoded_cols.append(col)
+
+    X = feature_df.select_dtypes(include=[np.number]).fillna(0)
+    X = X.replace([np.inf, -np.inf], 0)
+
+    return X, id_cols, text_cols, encoded_cols
 
 
 class ModelTrainerAgent(BaseAgent):
@@ -81,12 +145,14 @@ class ModelTrainerAgent(BaseAgent):
         # ---- Prepare target ----
         y = df[target_column].copy()
         label_encoder = None
+        target_encoded = False
 
         if y.dtype == "object" or y.dtype.name == "category" or pd.api.types.is_string_dtype(y):
             from sklearn.preprocessing import LabelEncoder
             label_encoder = LabelEncoder()
             y = y.fillna("_missing_")
             y = pd.Series(label_encoder.fit_transform(y.astype(str)), index=y.index)
+            target_encoded = True
 
         # Drop rows where target is NaN (for numeric targets)
         valid_mask = y.notna()
@@ -96,31 +162,21 @@ class ModelTrainerAgent(BaseAgent):
                 error=f"Only {int(valid_mask.sum())} rows have valid target values. Need at least 10.",
             )
 
-        # ---- Prepare features ----
-        feature_df = df.drop(columns=[target_column])
-
-        # Drop ID-like columns
-        id_cols = [c for c in feature_df.columns if _is_id_column(feature_df, c)]
-        if id_cols:
-            feature_df = feature_df.drop(columns=id_cols)
-
-        X = feature_df.select_dtypes(include=[np.number]).fillna(0)
+        # ---- Prepare features (auto-encode categoricals) ----
+        X, id_cols, text_cols, encoded_cols = _prepare_features(df, target_column)
 
         if X.shape[1] == 0:
             return TaskResult(
                 success=False,
                 error=(
-                    "No numeric features available for training. "
-                    "Run feature engineering first to encode categorical columns."
+                    "No usable features available for training after dropping "
+                    "ID/text columns and encoding categoricals."
                 ),
             )
 
         # Align X and y on valid rows
         X = X.loc[valid_mask]
         y = y.loc[valid_mask]
-
-        # Replace inf values
-        X = X.replace([np.inf, -np.inf], 0)
 
         # Adjust CV folds for small datasets
         cv_folds = min(cv_folds, max(2, len(y) // 10))
@@ -242,8 +298,10 @@ class ModelTrainerAgent(BaseAgent):
                 "task_type": task_type,
                 "n_features": X.shape[1],
                 "n_samples": len(y),
-                "target_encoded": label_encoder is not None,
+                "target_encoded": target_encoded,
                 "id_columns_dropped": id_cols,
+                "text_columns_dropped": text_cols,
+                "categorical_features_encoded": encoded_cols,
             },
             metrics={"models_trained": len(results), "best_model": best_name}
         )

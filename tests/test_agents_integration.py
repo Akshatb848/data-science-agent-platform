@@ -34,6 +34,45 @@ class TestDataCleanerIntegration:
         assert "handle_missing" in steps
         assert steps["handle_missing"]["values_filled"] > 0
 
+    @pytest.mark.asyncio
+    async def test_clean_data_per_column_details(self, sample_customer_support_df):
+        """Cleaning report should include per-column missing value details."""
+        agent = DataCleanerAgent()
+        result = await agent.run({"action": "clean_data", "dataframe": sample_customer_support_df})
+        assert result.success
+        report = result.data["cleaning_report"]
+        steps = {s["step"]: s for s in report["steps"]}
+        missing_step = steps["handle_missing"]
+        details = missing_step.get("details", [])
+        assert len(details) > 0
+        # Each detail should have column, filled count, and strategy
+        for d in details:
+            assert "column" in d
+            assert "filled" in d
+            assert "strategy" in d
+            assert d["strategy"] in ("median", "mode")
+
+    @pytest.mark.asyncio
+    async def test_clean_data_original_missing_total(self, sample_customer_support_df):
+        """Cleaning report should track original missing total."""
+        agent = DataCleanerAgent()
+        result = await agent.run({"action": "clean_data", "dataframe": sample_customer_support_df})
+        assert result.success
+        report = result.data["cleaning_report"]
+        assert report["original_missing_total"] > 0
+        assert report["final_missing_total"] == 0
+
+    @pytest.mark.asyncio
+    async def test_clean_data_skips_id_outliers(self, sample_customer_support_df):
+        """Outlier clipping should skip ID columns."""
+        agent = DataCleanerAgent()
+        result = await agent.run({"action": "clean_data", "dataframe": sample_customer_support_df})
+        assert result.success
+        steps = {s["step"]: s for s in result.data["cleaning_report"]["steps"]}
+        outlier_step = steps.get("handle_outliers", {})
+        outlier_cols = [d["column"] for d in outlier_step.get("details", [])]
+        assert "Ticket ID" not in outlier_cols
+
 
 class TestEDAIntegration:
     @pytest.mark.asyncio
@@ -151,15 +190,15 @@ class TestModelTrainerIntegration:
             "dataframe": df,
             "target_column": "target",
         })
-        assert not result.success
-        assert "No numeric features" in result.error
+        # With auto-encoding, name and city get encoded (low cardinality)
+        # So this should now succeed
+        assert result.success
+        assert len(result.data["results"]) >= 1
 
     @pytest.mark.asyncio
     async def test_train_drops_id_columns(self, sample_customer_support_df):
         """ID columns should be dropped before training."""
-        # Add numeric features so training can proceed
         df = sample_customer_support_df.copy()
-        df["feature_numeric"] = np.random.randn(len(df))
         agent = ModelTrainerAgent()
         result = await agent.run({
             "action": "train_models",
@@ -169,6 +208,40 @@ class TestModelTrainerIntegration:
         })
         assert result.success
         assert "Ticket ID" in result.data.get("id_columns_dropped", [])
+
+    @pytest.mark.asyncio
+    async def test_train_on_raw_customer_support_data(self, sample_customer_support_df):
+        """ModelTrainer should work on raw data WITHOUT feature engineering first."""
+        agent = ModelTrainerAgent()
+        result = await agent.run({
+            "action": "train_models",
+            "dataframe": sample_customer_support_df,
+            "target_column": "Customer Satisfaction Rating",
+            "cv_folds": 2,
+        })
+        assert result.success
+        # Should have auto-encoded categoricals
+        assert len(result.data.get("categorical_features_encoded", [])) > 0
+        # Should have dropped text/ID columns
+        assert len(result.data.get("text_columns_dropped", [])) > 0 or len(result.data.get("id_columns_dropped", [])) > 0
+        # Should have trained multiple models
+        assert len(result.data["results"]) >= 3
+
+    @pytest.mark.asyncio
+    async def test_train_auto_encodes_categoricals(self, sample_classification_df):
+        """ModelTrainer should auto-encode categorical features internally."""
+        # Keep the categorical column this time (don't drop feature_c)
+        agent = ModelTrainerAgent()
+        result = await agent.run({
+            "action": "train_models",
+            "dataframe": sample_classification_df,
+            "target_column": "target",
+            "cv_folds": 3,
+        })
+        assert result.success
+        assert "feature_c" in result.data.get("categorical_features_encoded", [])
+        # n_features should be > 2 (feature_a, feature_b + encoded feature_c)
+        assert result.data["n_features"] > 2
 
 
 class TestAutoMLIntegration:
@@ -195,6 +268,19 @@ class TestAutoMLIntegration:
         })
         assert result.success
         assert result.data["target_encoded"] is True
+
+    @pytest.mark.asyncio
+    async def test_auto_select_on_raw_customer_support(self, sample_customer_support_df):
+        """AutoML should work on raw data without prior feature engineering."""
+        agent = AutoMLAgent()
+        result = await agent.run({
+            "action": "auto_select_models",
+            "dataframe": sample_customer_support_df,
+            "target_column": "Ticket Priority",
+        })
+        assert result.success
+        assert result.data["target_encoded"] is True
+        assert len(result.data["results"]) >= 3
 
 
 class TestDataVisualizerIntegration:
@@ -316,3 +402,28 @@ class TestPipelineEndToEnd:
         assert result.success
         assert result.data["target_encoded"] is True
         assert len(result.data["results"]) >= 1
+
+    @pytest.mark.asyncio
+    async def test_direct_train_without_fe(self, sample_customer_support_df):
+        """Model training should work directly on raw data (no FE step)."""
+        df = sample_customer_support_df
+        target = "Ticket Priority"
+
+        # Only clean, then go straight to training
+        cleaner = DataCleanerAgent()
+        result = await cleaner.run({"action": "clean_data", "dataframe": df})
+        assert result.success
+        df = result.data["dataframe"]
+
+        # Train directly — should auto-encode categoricals internally
+        trainer = ModelTrainerAgent()
+        result = await trainer.run({
+            "action": "train_models",
+            "dataframe": df,
+            "target_column": target,
+            "cv_folds": 2,
+        })
+        assert result.success
+        assert result.data["target_encoded"] is True
+        assert len(result.data["categorical_features_encoded"]) > 0
+        assert len(result.data["results"]) >= 3

@@ -1,9 +1,10 @@
 """
 Data Cleaner Agent - Handles data preprocessing and cleaning
 
-Improvements:
+Robust for any dataset:
 - Skips ID columns for outlier handling
-- Better missing value reporting
+- Uses pandas 3.x compatible dtype checks
+- Per-column missing value reporting with imputation strategy
 - Detailed cleaning report
 """
 
@@ -76,10 +77,14 @@ class DataCleanerAgent(BaseAgent):
 
         original_shape = df.shape
         original_missing_total = int(df.isnull().sum().sum())
+        original_missing_by_col = {
+            col: int(n) for col, n in df.isnull().sum().items() if n > 0
+        }
         self.cleaning_report = {
             "original_shape": original_shape,
             "original_missing": df.isnull().sum().to_dict(),
             "original_missing_total": original_missing_total,
+            "original_missing_by_column": original_missing_by_col,
             "original_duplicates": int(df.duplicated().sum()),
             "steps": [],
             "timestamp": datetime.now().isoformat()
@@ -95,22 +100,38 @@ class DataCleanerAgent(BaseAgent):
             removed = before - len(df)
             self.cleaning_report["steps"].append({"step": "remove_duplicates", "removed": removed})
 
-        # Handle missing values
+        # Handle missing values with per-column detail
         missing_handled = 0
+        missing_details = []
         if task.get("handle_missing", True):
             for col in df.columns:
                 n_missing = int(df[col].isnull().sum())
                 if n_missing > 0:
-                    if df[col].dtype in ['int64', 'float64']:
-                        df[col] = df[col].fillna(df[col].median())
+                    strategy = "unknown"
+                    if pd.api.types.is_numeric_dtype(df[col]):
+                        median_val = df[col].median()
+                        df[col] = df[col].fillna(median_val)
+                        strategy = "median"
                     else:
                         mode = df[col].mode()
-                        df[col] = df[col].fillna(mode[0] if len(mode) > 0 else "Unknown")
+                        fill_val = mode[0] if len(mode) > 0 else "Unknown"
+                        df[col] = df[col].fillna(fill_val)
+                        strategy = "mode"
                     missing_handled += n_missing
-            self.cleaning_report["steps"].append({"step": "handle_missing", "values_filled": missing_handled})
+                    missing_details.append({
+                        "column": col,
+                        "filled": n_missing,
+                        "strategy": strategy,
+                    })
+            self.cleaning_report["steps"].append({
+                "step": "handle_missing",
+                "values_filled": missing_handled,
+                "details": missing_details,
+            })
 
         # Handle outliers (skip ID columns)
         outliers_clipped = 0
+        outlier_details = []
         if task.get("handle_outliers", True):
             numeric_cols = [c for c in df.select_dtypes(include=[np.number]).columns if c not in id_cols]
             for col in numeric_cols:
@@ -120,9 +141,15 @@ class DataCleanerAgent(BaseAgent):
                     lower = Q1 - 1.5 * IQR
                     upper = Q3 + 1.5 * IQR
                     n_outliers = int(((df[col] < lower) | (df[col] > upper)).sum())
-                    outliers_clipped += n_outliers
+                    if n_outliers > 0:
+                        outliers_clipped += n_outliers
+                        outlier_details.append({"column": col, "clipped": n_outliers})
                     df[col] = df[col].clip(lower=lower, upper=upper)
-            self.cleaning_report["steps"].append({"step": "handle_outliers", "clipped": outliers_clipped})
+            self.cleaning_report["steps"].append({
+                "step": "handle_outliers",
+                "clipped": outliers_clipped,
+                "details": outlier_details,
+            })
 
         self.cleaning_report["final_shape"] = df.shape
         self.cleaning_report["final_missing"] = df.isnull().sum().to_dict()
@@ -141,7 +168,7 @@ class DataCleanerAgent(BaseAgent):
 
         for col in df.columns:
             if df[col].isnull().sum() > 0:
-                if df[col].dtype in ['int64', 'float64']:
+                if pd.api.types.is_numeric_dtype(df[col]):
                     df[col] = df[col].fillna(df[col].median())
                 else:
                     mode = df[col].mode()

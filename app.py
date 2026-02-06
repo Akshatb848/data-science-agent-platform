@@ -605,6 +605,22 @@ async def _run_full_pipeline(user_context: str) -> str:
 
     st.session_state.pipeline_ran = True
 
+    # Auto-build dashboard at the end of pipeline
+    dashboard_agent = coordinator.agent_registry.get("DashboardBuilderAgent")
+    if dashboard_agent:
+        dash_task = {
+            "action": "build_dashboard",
+            "dataframe": current_df,
+            "target_column": target,
+            "eda_report": st.session_state.analysis_results.get("eda", {}),
+            "model_results": st.session_state.analysis_results.get("modeling", {}),
+            "cleaning_report": st.session_state.analysis_results.get("cleaning", {}),
+        }
+        dash_result = await dashboard_agent.run(dash_task)
+        if dash_result.success:
+            dash_data = dash_result.data if isinstance(dash_result.data, dict) else {}
+            _store_agent_result("DashboardBuilderAgent", "build_dashboard", dash_data)
+
     # Compile a summary of everything
     summary_data = {}
     for key, val in st.session_state.analysis_results.items():
@@ -617,6 +633,11 @@ async def _run_full_pipeline(user_context: str) -> str:
 
     if results_parts:
         interpretation += "\n\n**Issues:**\n" + "\n".join(results_parts)
+
+    # Attach dashboard sections to response
+    dash_components = st.session_state.analysis_results.get("dashboard", {}).get("components", [])
+    if dash_components:
+        return interpretation, {"dashboard": dash_components}
 
     return interpretation
 
