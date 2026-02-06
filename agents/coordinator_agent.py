@@ -339,6 +339,118 @@ class CoordinatorAgent(BaseAgent):
         return "\n".join(lines)
 
     # ------------------------------------------------------------------
+    # Conversational reply (GPT-like interactive responses)
+    # ------------------------------------------------------------------
+
+    async def generate_conversational_reply(
+        self, user_message: str, context: Optional[Dict[str, Any]] = None
+    ) -> str:
+        """Generate an interactive, context-aware reply for general queries.
+
+        When the user's message doesn't map to a specific agent action,
+        this method produces a helpful, conversational response that
+        references the current state and suggests next steps — similar
+        to how a GPT-style assistant would respond.
+        """
+        context = context or {}
+
+        from llm.client import FallbackClient
+        if self.llm_client is None or isinstance(self.llm_client, FallbackClient):
+            return self._fallback_conversational_reply(user_message, context)
+
+        # LLM-powered conversational reply
+        from llm.prompts import PromptTemplates
+
+        prompt = PromptTemplates.conversational_reply(
+            user_message, context, self.analysis_history
+        )
+
+        # Include recent conversation history for continuity
+        messages = self.get_llm_messages()
+        messages.append({"role": "user", "content": prompt})
+
+        try:
+            reply = await self.llm_client.chat(
+                messages=messages,
+                system=self.get_system_prompt(),
+                temperature=0.5,
+            )
+            return reply
+        except Exception as e:
+            logger.error(f"LLM conversational reply failed: {e}")
+            return self._fallback_conversational_reply(user_message, context)
+
+    def _fallback_conversational_reply(
+        self, user_message: str, context: Dict[str, Any]
+    ) -> str:
+        """Generate a rich, context-aware reply without an LLM."""
+        has_dataset = context.get("has_dataset", False)
+        has_target = context.get("has_target", False)
+        dataset_summary = context.get("dataset_summary", "")
+        completed_analyses = context.get("completed_analyses", {})
+        completed = list(completed_analyses.keys()) if completed_analyses else []
+
+        lines: list[str] = []
+        msg_lower = user_message.lower().strip()
+
+        # --- Acknowledge the user's message naturally ---
+        if any(g in msg_lower for g in ["hi", "hello", "hey", "good morning", "good afternoon", "good evening"]):
+            lines.append("Hello! I'm your AI Data Scientist assistant. Great to have you here!")
+        elif any(g in msg_lower for g in ["thank", "thanks", "appreciate"]):
+            lines.append("You're welcome! Happy to help with your data science tasks.")
+        elif any(g in msg_lower for g in ["what can you", "capabilities", "what do you"]):
+            return self.get_help_message()
+        elif any(g in msg_lower for g in ["what is", "explain", "how does", "difference between", "when to use", "why"]):
+            lines.append("That's a great data science question! I work best when analyzing your actual data, so I can demonstrate concepts hands-on.")
+            lines.append("")
+            lines.append("Upload a dataset and I can show you these concepts in action with real results!")
+        else:
+            lines.append("I'd be happy to help with your data science needs!")
+
+        lines.append("")
+
+        # --- Context-aware suggestions ---
+        if not has_dataset:
+            lines.append("**To get started**, upload a dataset using the sidebar — I support CSV, Excel, JSON, and Parquet formats. You can also try one of the sample datasets.")
+        elif not completed:
+            lines.append(f"**Your dataset is loaded** ({dataset_summary})." if dataset_summary else "**Your dataset is loaded.**")
+            lines.append("")
+            lines.append("Here's what I'd suggest next:")
+            lines.append("- **\"Analyze my data\"** — Run exploratory data analysis to understand your dataset")
+            lines.append("- **\"Clean the data\"** — Handle missing values, duplicates, and outliers")
+            if has_target:
+                lines.append("- **\"Train models\"** — Build and compare machine learning models")
+                lines.append("- **\"Run full analysis\"** — Execute the complete pipeline from cleaning to modeling")
+            else:
+                lines.append("- **Set a target column** in the sidebar if you want to train predictive models")
+        else:
+            lines.append(f"**Your dataset is loaded** ({dataset_summary})." if dataset_summary else "**Your dataset is loaded.**")
+            lines.append(f"**Completed so far**: {', '.join(completed)}")
+            lines.append("")
+
+            # Suggest next steps based on what's been done
+            all_steps = ["cleaning", "eda", "feature_engineering", "modeling", "automl", "visualization", "dashboard"]
+            remaining = [s for s in all_steps if s not in completed]
+            if remaining:
+                next_suggestions = {
+                    "cleaning": "**\"Clean the data\"** — preprocess and handle data quality issues",
+                    "eda": "**\"Analyze my data\"** — run exploratory data analysis",
+                    "feature_engineering": "**\"Engineer features\"** — create and transform features",
+                    "modeling": "**\"Train models\"** — build and compare ML models",
+                    "automl": "**\"Run AutoML\"** — automatically find the best model",
+                    "visualization": "**\"Show visualizations\"** — generate charts and plots",
+                    "dashboard": "**\"Build dashboard\"** — compile a summary report",
+                }
+                lines.append("**Suggested next steps:**")
+                for step in remaining[:3]:
+                    if step in next_suggestions:
+                        lines.append(f"- {next_suggestions[step]}")
+            else:
+                lines.append("You've completed a thorough analysis! You can re-run any step or upload a new dataset to start fresh.")
+
+        return "\n".join(lines)
+
+    # ------------------------------------------------------------------
     # Dynamic workflow planning
     # ------------------------------------------------------------------
 
