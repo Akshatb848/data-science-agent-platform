@@ -123,7 +123,6 @@ UI Rendering
    - Render history registry
 
 9) **Production & Safety Layer**
-8) **Production & Safety Layer**
    - Structured logging
    - Error classification and user‑safe messaging
    - UI collision prevention and throttling
@@ -180,7 +179,6 @@ key = f"{dataset_hash}:{workflow_step_id}:{chart_type}:{chart_signature}"\
 - If collision resolution fails, render a safe fallback (e.g., text summary) and log the error.
 
 ### 4.3 Render Safety Boundaries
-### 3.3 Render Safety Boundaries
 - **No UI rendering inside agent execution**; agents produce pure data structures only.
 - UI rendering should be performed in one deterministic pass at the UI layer.
 - Reruns must replay the exact same rendering order using stored render metadata.
@@ -188,7 +186,6 @@ key = f"{dataset_hash}:{workflow_step_id}:{chart_type}:{chart_signature}"\
 ---
 
 ## 5) Data Robustness by Design
-## 4) Data Robustness by Design
 
 | Data Type | Detection Strategy | Decision Logic | Fallback Behavior | Failure Messaging |
 |---|---|---|---|---|
@@ -205,7 +202,6 @@ key = f"{dataset_hash}:{workflow_step_id}:{chart_type}:{chart_signature}"\
 ---
 
 ## 6) Professional Data Scientist Behavior Guarantees
-## 5) Professional Data Scientist Behavior Guarantees
 - **Clarification gate**: If intent confidence < threshold, ask clarifying questions before execution.
 - **Metric gating**: Choose metrics based on task type (classification vs regression).
 - **Unsafe request refusal**: detect PII leakage or nonsensical tasks.
@@ -222,12 +218,6 @@ key = f"{dataset_hash}:{workflow_step_id}:{chart_type}:{chart_signature}"\
 | LLM auth failure | Invalid key / auth error | Block execution | "LLM auth failed; update API key" | Logged with error code |
 | LLM rate limit | Rate limit headers / status | Backoff + pause | "LLM rate‑limited; retry later" | Logged with rate info |
 | LLM inference failure | Empty/invalid response | Block planning | "LLM response invalid; cannot proceed" | Logged with response hash |
-## 6) Failure‑First System Design
-
-### 6.1 Failure Handling Matrix
-| Failure | Detection | Response | User Messaging | Observability |
-|---|---|---|---|---|
-| LLM failure | API error / timeout | Fallback client | "LLM unavailable; using fallback reasoning" | Logged with error code |
 | Tool failure | Exception | Retry → fallback | "Step failed; retrying / fallback used" | Traceable step ID |
 | UI collision | Key collision | Resolve or fallback text | "Chart rendering skipped due to UI collision" | Render registry audit |
 | Data leakage | Target leakage detection | Stop pipeline | "Potential leakage detected; adjust features" | Logged & surfaced |
@@ -262,22 +252,6 @@ key = f"{dataset_hash}:{workflow_step_id}:{chart_type}:{chart_signature}"\
 - Re‑render loops, multiple charts of same type, dynamic chart generation, conditional UI blocks, session restarts.
 
 ### 8.7 Failure Injection
-## 7) Exhaustive Testing Framework (Zero Exceptions)
-
-### 7.1 Data Testing
-- Clean/dirty CSV, missing values, mixed dtypes, high cardinality, time series, imbalanced, JSON, text, empty/corrupted.
-- Each test validates detection, routing, fallback, and messaging.
-
-### 7.2 Intent Testing
-- Explicit tasks, ambiguous goals, contradictory goals, mid‑execution redirects.
-
-### 7.3 Pipeline Testing
-- Partial execution, failed model training, metric mismatch, leakage detection, evaluation misuse.
-
-### 7.4 UI / Frontend Testing
-- Re‑render loops, multiple charts of same type, dynamic chart generation, conditional UI blocks, session restarts.
-
-### 7.5 Failure Injection
 - Tool failures, LLM hallucinations, timeouts, memory corruption, UI state desync.
 
 Each test defines: **Detection mechanism**, **Expected behavior**, **Recovery strategy**, **User‑visible messaging**.
@@ -291,9 +265,6 @@ Each test defines: **Detection mechanism**, **Expected behavior**, **Recovery st
    - Root cause: no real provider/auth validation; UI can claim success without live checks
    - Fix: mandatory LLM readiness gate with deterministic auth + inference probes
 
-## 8) Gap‑Driven Refactor Plan
-
-### 8.1 Key Gaps
 1. **UI element ID collisions (Critical)**
    - Root cause: no deterministic keys; UI rendering inside loops
    - Fix: explicit key strategy + render registry + separation of compute/render
@@ -327,16 +298,6 @@ Each test defines: **Detection mechanism**, **Expected behavior**, **Recovery st
 ## 10) Production Readiness Checklist
 - [ ] LLM readiness gate with live auth and inference checks
 - [ ] Truthful UI readiness indicators (no fake success)
-### 8.2 Refactor Strategy (Incremental)
-1. **Introduce UI render registry** in `app.py`
-2. **Separate render payloads from agent outputs**
-3. **Add dataset hash to session state**
-4. **Enforce key generation for every Streamlit element**
-5. **Add structured error taxonomy & logging**
-
----
-
-## 9) Production Readiness Checklist
 - [ ] Deterministic UI rendering with explicit keys
 - [ ] Render registry and collision detection
 - [ ] Step‑level orchestration logs
@@ -362,22 +323,6 @@ Each test defines: **Detection mechanism**, **Expected behavior**, **Recovery st
 ## 12) Deliverables Summary
 - Current architecture map and failure analysis
 - LLM trust & validation flow
-- [ ] Test suite covering UI collisions and failure injection
-
----
-
-## 10) Migration Plan (Safe, Incremental)
-1. Add render registry + deterministic key builder
-2. Introduce dataset hashing and attach to render keys
-3. Refactor agent outputs to pure data payloads
-4. Add orchestration checkpoints and failure taxonomy
-5. Add UI collision tests + failure injection tests
-6. Integrate clarification gating and confidence thresholds
-
----
-
-## 11) Deliverables Summary
-- Current architecture map and failure analysis
 - Target architecture blueprint
 - UI‑safe rendering strategy
 - Failure handling matrix
