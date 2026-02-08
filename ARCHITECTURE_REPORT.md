@@ -137,6 +137,9 @@ UI Rendering
 ## 4) UI & Streamlit Failure Immunity Strategy (Mandatory)
 
 ### 4.1 Deterministic Keying Strategy (Non‑Optional)
+## 3) UI & Streamlit Failure Immunity Strategy (Mandatory)
+
+### 3.1 Deterministic Keying Strategy (Non‑Optional)
 Every UI element **must** have a stable key that includes:
 - Dataset hash (or project ID)
 - Execution step ID

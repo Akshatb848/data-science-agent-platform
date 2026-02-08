@@ -35,7 +35,7 @@ from agents.data_visualizer_agent import DataVisualizerAgent
 from agents.forecast_agent import ForecastAgent
 from agents.insights_agent import InsightsAgent
 from agents.report_generator_agent import ReportGeneratorAgent
-from llm import get_llm_client, validate_llm_client
+from llm import get_llm_client, validate_llm_client, FallbackClient
 from llm.prompts import PromptTemplates
 from utils.helpers import generate_sample_data
 
@@ -376,12 +376,15 @@ def render_sidebar():
             )
             if st.button("Connect Local LLM"):
                 from llm.client import get_llm_client as _get
+                p = None if provider == "auto" else provider
                 client = _get(
-                    provider="ollama",
+                    provider=p,
+                    api_key=api_key or None,
                     model=model or None,
-                    base_url=base_url or None,
                     allow_fallback=False,
                 )
+                if provider == "fallback":
+                    client = FallbackClient()
                 validation = run_async(validate_llm_client(client))
                 st.session_state.llm_status = validation.to_dict()
                 if validation.state == "connected":
