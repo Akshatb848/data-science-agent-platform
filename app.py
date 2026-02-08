@@ -35,7 +35,7 @@ from agents.data_visualizer_agent import DataVisualizerAgent
 from agents.forecast_agent import ForecastAgent
 from agents.insights_agent import InsightsAgent
 from agents.report_generator_agent import ReportGeneratorAgent
-from llm.client import get_llm_client
+from llm import get_llm_client, validate_llm_client
 from llm.prompts import PromptTemplates
 from utils.helpers import generate_sample_data
 
@@ -317,7 +317,7 @@ def get_dataset_summary() -> str:
 def init_session_state():
     """Initialise all session state keys."""
     if "coordinator" not in st.session_state:
-        llm_client = get_llm_client()
+        llm_client = get_llm_client(allow_fallback=False)
         coordinator = CoordinatorAgent(llm_client=llm_client)
         coordinator.register_agent(DataCleanerAgent())
         coordinator.register_agent(EDAAgent())
@@ -338,6 +338,7 @@ def init_session_state():
         "current_df": None,  # working copy after cleaning / FE
         "analysis_results": {},
         "pipeline_ran": False,
+        "llm_status": {"state": "unverified", "message": "LLM not validated yet."},
     }
     for key, val in defaults.items():
         if key not in st.session_state:
@@ -348,6 +349,13 @@ def init_session_state():
         welcome = st.session_state.coordinator.get_welcome_message()
         st.session_state.messages.append({"role": "assistant", "content": welcome})
 
+    if (
+        st.session_state.llm_status.get("state") == "unverified"
+        and st.session_state.coordinator.llm_client
+    ):
+        validation = run_async(validate_llm_client(st.session_state.coordinator.llm_client))
+        st.session_state.llm_status = validation.to_dict()
+
 
 # ---------- sidebar ----------
 
@@ -357,21 +365,36 @@ def render_sidebar():
             '<h2 class="main-header">🔬 DS Agent</h2>', unsafe_allow_html=True
         )
 
-        # LLM provider config
-        with st.expander("🤖 LLM Configuration", expanded=False):
-            provider = st.selectbox(
-                "Provider",
-                ["auto", "openai", "anthropic", "ollama", "fallback"],
-                help="auto = detect from env vars",
+        # LLM provider config (local open-source via Ollama)
+        with st.expander("🤖 Local LLM (Ollama)", expanded=False):
+            st.markdown("This app uses a local open-source model via Ollama. No API key required.")
+            model = st.text_input("Model", value="llama3.1", help="Ollama model name")
+            base_url = st.text_input(
+                "Ollama Base URL",
+                value="http://localhost:11434",
+                help="URL where the Ollama server is running",
             )
-            api_key = st.text_input("API Key (optional)", type="password")
-            model = st.text_input("Model (optional)", placeholder="e.g. gpt-4o-mini")
-            if st.button("Apply LLM Config"):
+            if st.button("Connect Local LLM"):
                 from llm.client import get_llm_client as _get
-                p = None if provider == "auto" else (None if provider == "fallback" else provider)
-                client = _get(provider=p, api_key=api_key or None, model=model or None)
-                st.session_state.coordinator.llm_client = client
-                st.success(f"LLM set to **{type(client).__name__}**")
+                client = _get(
+                    provider="ollama",
+                    model=model or None,
+                    base_url=base_url or None,
+                    allow_fallback=False,
+                )
+                validation = run_async(validate_llm_client(client))
+                st.session_state.llm_status = validation.to_dict()
+                if validation.state == "connected":
+                    st.session_state.coordinator.llm_client = client
+                    st.success(f"LLM validated: **{validation.provider}** / **{validation.model}**")
+                elif validation.state == "rate_limited":
+                    st.session_state.coordinator.llm_client = client
+                    st.warning(validation.message)
+                else:
+                    st.session_state.coordinator.llm_client = None
+                    st.error(validation.message)
+
+            _render_llm_status_panel()
 
         st.markdown("---")
 
@@ -450,6 +473,27 @@ def _load_uploaded_file(uploaded):
         _set_dataframe(df, name)
     except Exception as e:
         st.sidebar.error(f"Error loading file: {e}")
+
+
+def _render_llm_status_panel():
+    """Render LLM readiness status with truthful messaging."""
+    status = st.session_state.get("llm_status", {"state": "unverified", "message": ""})
+    state = status.get("state", "unverified")
+    message = status.get("message", "")
+    provider = status.get("provider")
+    model = status.get("model")
+    detail = message
+    if provider and model:
+        detail = f"{detail} (Provider: {provider}, Model: {model})"
+
+    if state == "connected":
+        st.success(f"Connected ✅ {detail}")
+    elif state == "rate_limited":
+        st.warning(f"Rate limited ⚠️ {detail}")
+    elif state == "unverified":
+        st.info(f"Not validated ℹ️ {detail}")
+    else:
+        st.error(f"Not connected ❌ {detail}")
 
 
 def _sanitize_dtypes(df: pd.DataFrame) -> pd.DataFrame:
@@ -812,6 +856,12 @@ def _render_professional_dashboard(sections):
 
 async def handle_user_message(user_input: str):
     """Process a user message through the coordinator agent."""
+    llm_status = st.session_state.get("llm_status", {})
+    if llm_status.get("state") != "connected":
+        return (
+            "LLM is not validated yet. Please configure a valid provider/API key in the sidebar. "
+            f"Status: {llm_status.get('state', 'unverified')}."
+        )
     coordinator: CoordinatorAgent = st.session_state.coordinator
     coordinator.add_to_memory("user", user_input)
 
