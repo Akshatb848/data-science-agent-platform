@@ -122,3 +122,4 @@ class BallTracker:
         self.trajectory.clear()
         self._prev_vy = 0.0
         self._bounce_cooldown = 0
+        self.frame_count = 0

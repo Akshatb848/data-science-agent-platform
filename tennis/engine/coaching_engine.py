@@ -224,6 +224,7 @@ class CoachingEngine:
         now = datetime.utcnow()
         goal = WeeklyGoal(
             player_id=player.id,
+            primary_goal="",
             week_start=now,
             week_end=now + timedelta(days=7),
         )
@@ -244,6 +245,9 @@ class CoachingEngine:
             top_issue = max(correction_counts, key=correction_counts.get)
             goal.primary_goal = f"Focus on improving {top_issue.replace('_', ' ')}"
             goal.target_metrics = {top_issue: 0.7}
+        else:
+            # Fallback: general improvement goal based on recent performance
+            goal.primary_goal = "Improve overall consistency and shot selection"
 
         goal.secondary_goals = ["Maintain first serve percentage above 60%", "Play at least 2 competitive points per session"]
         goal.sessions_target = 3
