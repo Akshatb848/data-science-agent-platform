@@ -14,6 +14,8 @@ from tennis.api.routes_stats import router as stats_router
 from tennis.api.routes_coaching import router as coaching_router
 from tennis.api.routes_video import router as video_router
 from tennis.api.routes_subscription import router as subscription_router
+from tennis.api.routes_recording import router as recording_router
+from tennis.api.routes_linecalls import router as linecalls_router
 
 
 def create_app() -> FastAPI:
@@ -21,9 +23,9 @@ def create_app() -> FastAPI:
     app = FastAPI(
         title="TennisIQ API",
         description=(
-            "AI-First Tennis Match Intelligence Platform. "
-            "Single-camera AI tennis intelligence that exceeds SwingVision "
-            "in coaching, accuracy, and scalability."
+            "Tennis Match Intelligence Platform. "
+            "Single-camera match recording, automated line calling, "
+            "player tracking, and post-match analysis."
         ),
         version=settings.APP_VERSION,
         docs_url="/docs",
@@ -49,6 +51,8 @@ def create_app() -> FastAPI:
     app.include_router(coaching_router, prefix=f"{prefix}/coaching", tags=["Coaching"])
     app.include_router(video_router, prefix=f"{prefix}/video", tags=["Video"])
     app.include_router(subscription_router, prefix=f"{prefix}/subscriptions", tags=["Subscriptions"])
+    app.include_router(recording_router, prefix=f"{prefix}/recording", tags=["Recording"])
+    app.include_router(linecalls_router, prefix=f"{prefix}/linecalls", tags=["Line Calls"])
 
     # ── Health check ────────────────────────────────────
     @app.get("/health", tags=["System"])
@@ -64,7 +68,7 @@ def create_app() -> FastAPI:
     async def root():
         return {
             "app": "TennisIQ",
-            "tagline": "AI-First Tennis Match Intelligence",
+            "description": "Tennis Match Intelligence",
             "version": settings.APP_VERSION,
             "docs": "/docs",
         }
