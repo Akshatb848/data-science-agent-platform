@@ -1,5 +1,7 @@
-"""LLM client using OpenRouter via Replit AI Integrations.
+"""LLM client using OpenRouter (OpenAI-compatible API).
 
+Credentials are read from ``OPENROUTER_API_KEY`` / ``OPENROUTER_BASE_URL``, falling
+back to the Replit AI Integrations variables ``AI_INTEGRATIONS_OPENROUTER_*``.
 Uses open-source models (Meta Llama 3.3 70B, Mistral Small 3.1) through OpenRouter.
 Falls back to rule-based analysis when the LLM service is unavailable.
 """
@@ -10,7 +12,7 @@ import json
 import logging
 import os
 import re
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Tuple
 
 from config.settings import LOG_FORMAT
 
@@ -23,13 +25,32 @@ if not logger.handlers:
 
 PRIMARY_MODEL = "meta-llama/llama-3.3-70b-instruct"
 FALLBACK_MODEL = "mistralai/mistral-small-3.1-24b-instruct"
+DEFAULT_OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1"
+
+
+def resolve_openrouter_config() -> Tuple[Optional[str], Optional[str]]:
+    """Return ``(base_url, api_key)`` for OpenRouter from the environment.
+
+    Standard ``OPENROUTER_API_KEY`` / ``OPENROUTER_BASE_URL`` take precedence; the
+    Replit AI Integrations variables are used as a fallback. When only an API key
+    is set, the public OpenRouter endpoint is used as the base URL.
+    """
+    api_key = os.environ.get("OPENROUTER_API_KEY") or os.environ.get(
+        "AI_INTEGRATIONS_OPENROUTER_API_KEY"
+    )
+    base_url = os.environ.get("OPENROUTER_BASE_URL") or os.environ.get(
+        "AI_INTEGRATIONS_OPENROUTER_BASE_URL"
+    )
+    if api_key and not base_url:
+        base_url = DEFAULT_OPENROUTER_BASE_URL
+    return base_url, api_key
 
 
 class LLMClient:
-    """LLM client powered by OpenRouter via Replit AI Integrations.
+    """LLM client powered by OpenRouter.
 
     Uses open-source models: Meta Llama 3.3 70B (primary) and Mistral Small 3.1 (fallback).
-    No API key management needed - handled automatically by Replit.
+    See ``resolve_openrouter_config`` for the environment variables that are read.
     """
 
     def __init__(self, model: str = PRIMARY_MODEL) -> None:
@@ -39,11 +60,12 @@ class LLMClient:
         self._init_client()
 
     def _init_client(self) -> None:
-        base_url = os.environ.get("AI_INTEGRATIONS_OPENROUTER_BASE_URL")
-        api_key = os.environ.get("AI_INTEGRATIONS_OPENROUTER_API_KEY")
+        base_url, api_key = resolve_openrouter_config()
 
         if not base_url or not api_key:
-            logger.warning("OpenRouter env vars not set - LLM will be unavailable")
+            logger.warning(
+                "OPENROUTER_API_KEY not set - LLM unavailable, using rule-based fallbacks"
+            )
             self._available = False
             return
 
