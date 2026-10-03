@@ -2,6 +2,13 @@ import os
 from dataclasses import dataclass, field
 from typing import Optional
 
+try:  # Load variables from a local .env file if python-dotenv is installed.
+    from dotenv import load_dotenv
+
+    load_dotenv(override=False)
+except ImportError:  # pragma: no cover
+    pass
+
 LOG_FORMAT: str = "%(asctime)s | %(name)s | %(levelname)s | %(message)s"
 
 
