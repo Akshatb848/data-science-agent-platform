@@ -179,8 +179,6 @@ setup_rag.py         Builds the RAG index from rag_docs/
   same split. The cross-validation score is computed on the training set.
 - `MLOpsDeploymentAgent` writes models to `./models/` and only generates
   deployment artefacts. Nothing is deployed or served.
-- Excel uploads need `openpyxl`, which is not in `requirements.txt`
-  (`pip install openpyxl`).
 - The "housing" sample in the dashboard downloads the California Housing dataset
   through scikit-learn, so it needs internet access on first use.
 - The API has no authentication, and CORS is open (`*`).
