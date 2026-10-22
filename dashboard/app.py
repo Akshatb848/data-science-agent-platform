@@ -16,7 +16,6 @@ from dashboard.components.visualizations import (
     plot_before_after_skewness,
     plot_correlation_heatmap,
     plot_distribution_analysis,
-    plot_feature_importance,
     plot_hypothesis_summary,
     plot_leaderboard,
     plot_missing_values,
@@ -67,6 +66,22 @@ st.markdown("""
         color: #94a3b8 !important;
         font-size: 0.85rem;
     }
+    /* The light text forced above was unreadable on Streamlit's default white
+       widgets, so give sidebar widgets dark surfaces to match. */
+    [data-testid="stSidebar"] [data-testid="stBaseButton-secondary"],
+    [data-testid="stSidebar"] [data-testid="stFileUploaderDropzone"],
+    [data-testid="stSidebar"] [data-baseweb="select"] > div,
+    [data-testid="stSidebar"] .stSelectbox [role="group"],
+    [data-testid="stSidebar"] .stSelectbox input {
+        background: #1e293b !important;
+        border-color: #334155 !important;
+    }
+    [data-testid="stSidebar"] [data-testid="stBaseButton-secondary"]:hover {
+        border-color: #6366f1 !important;
+    }
+    [data-testid="stSidebar"] .status-completed { color: #166534 !important; }
+    [data-testid="stSidebar"] .status-failed { color: #991b1b !important; }
+    [data-testid="stSidebar"] .status-pending { color: #475569 !important; }
 
     .stTabs [data-baseweb="tab-list"] {
         gap: 0;

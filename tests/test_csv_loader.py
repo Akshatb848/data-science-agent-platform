@@ -10,7 +10,6 @@ import os
 import tempfile
 
 import numpy as np
-import pandas as pd
 import pytest
 
 from utils.csv_loader import CSVLoadError, load_csv
@@ -195,6 +194,24 @@ class TestNatureDetection:
         data = "\n".join(rows).encode("utf-8")
         df, profile = load_csv(data)
         assert "id" in profile["id_columns"]
+
+    def test_id_hint_matches_whole_words_only(self):
+        """Names that merely contain the letters "id" are not ID columns."""
+        from utils.csv_loader import _name_has_id_token
+        for name in ["customer_id", "CustomerID", "Row ID", "record-id", "uuid", "row_number"]:
+            assert _name_has_id_token(name), name
+        for name in ["sepal width (cm)", "petal width (cm)", "valid", "amount_paid",
+                     "humidity", "provider", "video_views", "bid_price"]:
+            assert not _name_has_id_token(name), name
+
+    def test_continuous_width_columns_are_not_ids(self):
+        """Regression: Iris-style "... width (cm)" features were flagged as IDs and dropped."""
+        rng = np.random.default_rng(0)
+        rows = ["sepal width (cm),petal width (cm),target"]
+        for _ in range(60):
+            rows.append(f"{rng.normal(3, 0.4):.1f},{rng.normal(1.2, 0.7):.1f},{rng.integers(0, 3)}")
+        df, profile = load_csv("\n".join(rows).encode("utf-8"))
+        assert profile["id_columns"] == []
 
     def test_target_hint_churn(self):
         """Column named 'churn' is detected as target."""

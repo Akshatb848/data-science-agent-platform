@@ -350,7 +350,6 @@ class LLMClient:
         parts = ["## Pipeline Results Summary\n"]
         profile = ctx.get("profile", {})
         model_data = ctx.get("model_results", {})
-        eng_data = ctx.get("engineering_data", {})
 
         if profile:
             stats = profile.get("stats", {})

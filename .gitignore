@@ -17,3 +17,12 @@ models/*.joblib
 *.log
 .coverage
 htmlcov/
+
+# Local environments, caches and secrets
+.venv/
+.ruff_cache/
+.env.*
+!.env.example
+.DS_Store
+# Artefacts written by the MLOps step
+models/

@@ -8,7 +8,8 @@ Works with both Streamlit UploadedFile and FastAPI UploadFile objects.
 import csv
 import io
 import logging
-from typing import Any, BinaryIO, Dict, List, Optional, Tuple, Union
+import re
+from typing import Any, Dict, List, Optional, Tuple
 
 import numpy as np
 import pandas as pd
@@ -473,15 +474,35 @@ def _find_target_column(
     return None
 
 
+def _name_tokens(name: str) -> List[str]:
+    """Split a column name into lower-case word tokens.
+
+    Handles snake_case, kebab-case, spaces and camelCase: "CustomerID" ->
+    ["customer", "id"], "sepal width (cm)" -> ["sepal", "width", "cm"].
+    """
+    return [t.lower() for t in re.findall(r"[A-Z]+(?![a-z])|[A-Z]?[a-z]+|\d+", str(name))]
+
+
+def _name_has_id_token(name: str) -> bool:
+    """True if an ID hint appears as a whole word (or word sequence) in the name.
+
+    Matching whole tokens rather than substrings keeps names such as "width",
+    "valid", "paid" or "humidity" from being mistaken for ID columns.
+    """
+    tokens = _name_tokens(name)
+    for hint in ID_HINTS:
+        parts = hint.split("_")
+        n = len(parts)
+        if any(tokens[i:i + n] == parts for i in range(len(tokens) - n + 1)):
+            return True
+    return False
+
+
 def _detect_id_columns(df: pd.DataFrame, schema: Dict[str, str]) -> List[str]:
     """Detect columns that look like IDs (near-unique, non-informative)."""
     id_cols = []
     for col in df.columns:
-        if col.lower().strip() in ID_HINTS:
-            id_cols.append(col)
-            continue
-
-        if any(hint in col.lower() for hint in ID_HINTS):
+        if col.lower().strip() in ID_HINTS or _name_has_id_token(col):
             id_cols.append(col)
             continue
 

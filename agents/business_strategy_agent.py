@@ -151,9 +151,6 @@ class BusinessStrategyAgent(BaseAgent):
         """Deterministic strategy based on the dataset profile."""
         problem_type = profile.get("problem_type", "eda_only")
         target = profile.get("target_column")
-        quality = profile.get("quality_score", 0)
-        stats = profile.get("stats", {})
-        schema = profile.get("schema", {})
 
         kpi_info = _KPI_MAP.get(problem_type, _KPI_MAP["eda_only"])
 
@@ -248,7 +245,6 @@ class BusinessStrategyAgent(BaseAgent):
             recs.append("Identify potential target variables for supervised learning")
 
         cat_cols = [c for c, t in schema.items() if t == "categorical"]
-        num_cols = [c for c, t in schema.items() if t == "numeric"]
 
         if len(cat_cols) > 10:
             recs.append(f"High number of categorical features ({len(cat_cols)}) – consider target encoding or embedding")

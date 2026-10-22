@@ -4,7 +4,6 @@ import time
 from typing import Any, Dict, List, Optional, Tuple
 
 import numpy as np
-import pandas as pd
 from sklearn.ensemble import (
     GradientBoostingClassifier,
     GradientBoostingRegressor,
@@ -13,9 +12,7 @@ from sklearn.ensemble import (
 )
 from sklearn.linear_model import LinearRegression, LogisticRegression
 from sklearn.metrics import (
-    accuracy_score,
     f1_score,
-    mean_squared_error,
     r2_score,
 )
 from sklearn.model_selection import cross_val_score
@@ -221,7 +218,6 @@ class ModelingMLAgent(BaseAgent):
         if is_classification:
             return float(f1_score(y_test, preds, average="weighted", zero_division=0))
         else:
-            rmse = float(np.sqrt(mean_squared_error(y_test, preds)))
             r2 = float(r2_score(y_test, preds)) if len(np.unique(y_test)) > 1 else 0.0
             return r2
 
