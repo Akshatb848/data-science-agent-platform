@@ -1,9 +1,39 @@
 # AI Data Scientist Platform
 
+**Give it a tabular dataset and a team of agents profiles it, frames the ML problem, engineers features, runs statistical tests, trains and tunes candidate models, and packages the champion, all visible in a Streamlit dashboard or callable through a FastAPI service.**
+
+[![Tests](https://github.com/Akshatb848/data-science-agent-platform/actions/workflows/test.yml/badge.svg)](https://github.com/Akshatb848/data-science-agent-platform/actions/workflows/test.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
+![Python 3.10+](https://img.shields.io/badge/Python-3.10%2B-blue)
+![Streamlit](https://img.shields.io/badge/Streamlit-FF4B4B?logo=streamlit&logoColor=white)
+![FastAPI](https://img.shields.io/badge/FastAPI-009688?logo=fastapi&logoColor=white)
+
+![Modeling tab after a full pipeline run on the Iris sample: leaderboard of 7 models and the tuned champion](docs/screenshots/modeling.jpg)
+
+<sub>Captured with headless Chromium from the dashboard running locally on the bundled <b>Iris</b> sample (150 rows),
+with Optuna tuning on and no LLM key. Iris is an easy, tiny dataset and the hold-out split is only 30 rows, so the
+scores say the pipeline works end to end, not that it is unusually accurate.</sub>
+
+<details>
+<summary><b>More screenshots</b> (feature engineering, statistical tests, assistant)</summary>
+
+**Feature engineering report:** before/after statistics, outlier handling, interaction features
+
+![Feature engineering tab](docs/screenshots/feature_engineering.jpg)
+
+**Exploration & testing:** skewness, normality tests, ANOVA / Kruskal-Wallis, correlation, VIF
+
+![Exploration tab](docs/screenshots/exploration.jpg)
+
+**Assistant** (rule-based mode, no API key)
+
+![Assistant tab](docs/screenshots/assistant.jpg)
+
+</details>
+
 A multi-agent pipeline that takes a tabular dataset and runs it end to end:
 profiling, problem framing, feature engineering, statistical exploration, model
-training and selection, and deployment packaging. The results appear in a Streamlit
-dashboard, and a FastAPI service exposes the same pipeline. An optional LLM
+training and selection, and deployment packaging. An optional LLM
 (via OpenRouter) and a ChromaDB knowledge base drive a chat assistant that can
 answer questions about the run.
 
@@ -40,23 +70,24 @@ deterministic, rule-based logic instead.
 
 ## Architecture
 
-```
-            ┌──────────────────────────┐        ┌────────────────────────┐
- upload ──▶ │ Streamlit (dashboard/)   │        │ FastAPI (services/api) │ ◀── HTTP
-            └────────────┬─────────────┘        └───────────┬────────────┘
-                         │      both call                   │
-                         ▼                                  ▼
-            ┌───────────────────────────────────────────────────────────┐
-            │ Orchestrator (agents/orchestrator.py)                     │
-            │  load+profile (utils/csv_loader.py)                       │
-            │   → BusinessStrategyAgent → DataEngineeringAgent          │
-            │   → ExploratoryAnalysisAgent → ModelingMLAgent            │
-            │   → MLOpsDeploymentAgent                                  │
-            └───────────────────────────────────────────────────────────┘
-                  │ optional                         │ optional
-                  ▼                                  ▼
-       core/llm_client.py (OpenRouter)      services/metadata.py (PostgreSQL)
-       core/rag_client.py (ChromaDB, rag_docs/)
+```mermaid
+flowchart TD
+    U[Upload CSV / JSON / Parquet / Excel<br/>or a sample dataset] --> UI[Streamlit dashboard<br/>dashboard/app.py]
+    C[HTTP client] --> API[FastAPI service<br/>services/api.py]
+    UI --> ORC
+    API --> ORC
+    subgraph ORC[Orchestrator: agents/orchestrator.py]
+      direction LR
+      L[Load + profile<br/>utils/csv_loader.py] --> BS[BusinessStrategyAgent]
+      BS --> DE[DataEngineeringAgent]
+      DE --> EA[ExploratoryAnalysisAgent]
+      EA --> ML[ModelingMLAgent<br/>sklearn, XGBoost, LightGBM, Optuna]
+      ML --> OPS[MLOpsDeploymentAgent<br/>joblib + inference script]
+    end
+    BS -. optional .-> LLM[core/llm_client.py<br/>OpenRouter: Llama 3.3 70B,<br/>fallback Mistral Small 3.1]
+    UI -. Assistant tab .-> LLM
+    UI -. Assistant tab .-> RAG[core/rag_client.py<br/>ChromaDB over rag_docs/]
+    API -. optional .-> PG[(PostgreSQL metadata<br/>services/metadata.py)]
 ```
 
 - Every agent subclasses `BaseAgent` (`agents/base.py`) and returns an
@@ -143,13 +174,15 @@ A `.env` file in the project root is loaded automatically.
 ## Tests
 
 ```bash
+pip install ruff
+ruff check .
 pytest -q
 ```
 
 The suite covers the CSV loader, each agent, the orchestrator end to end, the
 LLM client (env-var handling, and chat/fallback against a mocked client) and the
-FastAPI endpoints. It makes no network calls and needs no API key. CI
-(`.github/workflows/test.yml`) runs it on Python 3.10 and 3.11.
+FastAPI endpoints (70 tests). It makes no network calls and needs no API key. CI
+(`.github/workflows/test.yml`) runs Ruff and the suite on Python 3.10 and 3.11.
 
 ## Project structure
 
@@ -163,6 +196,7 @@ config/settings.py   Environment-driven settings
 rag_docs/            Markdown knowledge base indexed into ChromaDB
 chroma_db/           Persisted ChromaDB index
 tests/               pytest suite
+docs/screenshots/    README images
 main.py              Starts the FastAPI service
 setup_rag.py         Builds the RAG index from rag_docs/
 ```
@@ -184,3 +218,14 @@ setup_rag.py         Builds the RAG index from rag_docs/
 - The API has no authentication, and CORS is open (`*`).
 - `replit.md` and `.replit` are leftovers from the original Replit setup. They
   are not required to run the project locally.
+- Running the dashboard rebuilds the ChromaDB index in `chroma_db/`, which is
+  checked in, so a local run leaves those files modified.
+- There is no Dockerfile yet; run it in a virtualenv as described above.
+
+## License
+
+[MIT](LICENSE) © 2026 Akshat Banga
+
+## Author
+
+**Akshat Banga** · [github.com/Akshatb848](https://github.com/Akshatb848)

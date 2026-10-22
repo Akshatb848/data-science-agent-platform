@@ -1,6 +1,20 @@
 [project]
-name = "repl-nix-workspace"
+name = "data-science-agent-platform"
 version = "0.1.0"
-description = "Add your description here"
-requires-python = ">=3.11"
+description = "Multi-agent pipeline that profiles a tabular dataset, engineers features, runs statistical tests, trains and selects models, and packages the champion, with a Streamlit UI and a FastAPI service."
+requires-python = ">=3.10"
+license = { text = "MIT" }
+authors = [{ name = "Akshat Banga" }]
+# Runtime dependencies are listed in requirements.txt.
 dependencies = []
+
+[tool.ruff]
+target-version = "py310"
+extend-exclude = ["attached_assets", "chroma_db"]
+
+[tool.ruff.lint]
+# Ruff's default rule set (pyflakes + core pycodestyle errors).
+select = ["E4", "E7", "E9", "F"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

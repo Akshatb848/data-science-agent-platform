@@ -6,7 +6,7 @@ ModelingML -> MLOpsDeployment, with optional LLM and RAG support.
 
 import logging
 import os
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, Optional
 
 from agents.base import AgentResult
 from agents.business_strategy_agent import BusinessStrategyAgent
@@ -231,7 +231,6 @@ class Orchestrator:
         self._state["mlops"] = "running"
         try:
             problem_type = self._context.get("problem_type", "regression")
-            eng = self._results.get("engineering")
             eval_metrics = {}
             if model_res.data.get("leaderboard"):
                 eval_metrics = {

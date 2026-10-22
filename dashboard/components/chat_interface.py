@@ -13,7 +13,6 @@ def render_chat(llm_client=None, rag_client=None, pipeline_context: dict = None)
 
     context = pipeline_context or {}
     has_llm = llm_client is not None and llm_client.is_available()
-    has_rag = rag_client is not None and rag_client.is_ready
 
     if has_llm:
         st.caption("Connected to LLM (Llama 3.3 70B) -- AI-powered analysis available")
@@ -204,7 +203,6 @@ def _suggest_improvements(profile, model_data, eng_data):
 
     if model_data:
         score = model_data.get("champion_score", 0)
-        champion = model_data.get("champion_name", "unknown")
         lb = model_data.get("leaderboard", [])
 
         if isinstance(score, (int, float)):

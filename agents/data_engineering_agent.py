@@ -1,11 +1,9 @@
 """Data Engineering Agent -- cleans, transforms, and prepares data for modelling."""
 
-import time
 from typing import Any, Dict, List, Optional, Tuple
 
 import numpy as np
 import pandas as pd
-from scipy import stats as sp_stats
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import StandardScaler, RobustScaler, LabelEncoder
 
